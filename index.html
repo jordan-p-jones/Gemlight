@@ -6,9 +6,11 @@
 <title>Gemlight — a calm match-3</title>
 <meta name="description" content="No timer. No losing. Just jewels. A calm match-3 with a garden that grows and a sky that fills.">
 <meta name="theme-color" content="#0e1622">
+
 <meta property="og:url" content="https://jordan-p-jones.github.io/Gemlight/">
 <meta property="og:image" content="https://jordan-p-jones.github.io/Gemlight/og.png">
 <meta name="twitter:image" content="https://jordan-p-jones.github.io/Gemlight/og.png">
+
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Gemlight">
 <meta property="og:title" content="Gemlight — a calm match-3">
@@ -54,6 +56,11 @@
     </div>
   </header>
 
+  <div id="storeWarn" hidden>
+    <span id="storeMsg"></span>
+    <button id="storeOpen">Open in new tab ↗</button>
+  </div>
+
   <nav id="tabs" aria-label="Screens">
     <button data-tab="play" class="on">✦ Play</button>
     <button data-tab="garden">❀ Garden<span class="badge" hidden></span></button>
@@ -94,6 +101,8 @@
   <div class="grab"></div>
   <div class="sheet-head"><h2>Settings</h2><button id="closeSheet" class="icon-btn" aria-label="Close settings">✕</button></div>
 
+  <div class="row btns"><button id="howBtn" class="wide">✦ How to play</button></div>
+
   <h3>Sound</h3>
   <div class="row"><span>Sound effects</span><label class="switch"><input type="checkbox" id="setSound" checked><span></span></label></div>
   <div class="row"><span>Ambient music</span><label class="switch"><input type="checkbox" id="setMusic"><span></span></label></div>
@@ -123,6 +132,13 @@
   <div id="stats"></div>
   <div id="unlockProg"></div>
 
+  <h3>Your progress</h3>
+  <div class="row"><span>Saving</span><span id="storeState" class="meta">—</span></div>
+  <div class="row btns"><button id="exportBtn" class="wide">⤓ Export save file</button></div>
+  <div class="row btns"><button id="importBtn" class="wide">⤒ Import save file</button></div>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+  <p class="foot">Save files are integrity-checked, so hand-edited files won't load. Export before clearing your browser or changing phone.</p>
+
   <h3>&nbsp;</h3>
   <div class="row btns"><button id="freshBtn" class="wide">✧ Start a fresh board</button></div>
   <div class="row btns"><button id="resetBtn" class="wide danger">Erase everything</button></div>
@@ -131,6 +147,46 @@
 </aside>
 
 <div id="confirm"><div class="card"><p id="confirmText"></p><div class="btns"><button id="confirmNo" class="wide">Keep playing</button><button id="confirmYes" class="wide accent">Yes</button></div></div></div>
+
+<div id="howto" role="dialog" aria-modal="true" aria-labelledby="howTitle">
+  <div class="card">
+    <h2 id="howTitle">How to play</h2>
+    <p class="lead">Swap two neighbouring jewels to line up three or more of the same kind. Tap one then tap its neighbour, or just swipe a jewel toward one.</p>
+
+    <h4>Special jewels</h4>
+    <div class="ht">
+      <svg viewBox="0 0 44 44" aria-hidden="true"><defs><radialGradient id="hb" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ffd7ea"/><stop offset=".45" stop-color="#f28bb8"/><stop offset="1" stop-color="#a04a78"/></radialGradient></defs>
+        <g fill="rgba(255,255,255,.55)"><ellipse cx="22" cy="7" rx="3.4" ry="5.4"/><ellipse cx="36" cy="17" rx="3.4" ry="5.4" transform="rotate(72 36 17)"/><ellipse cx="31" cy="34" rx="3.4" ry="5.4" transform="rotate(144 31 34)"/><ellipse cx="13" cy="34" rx="3.4" ry="5.4" transform="rotate(216 13 34)"/><ellipse cx="8" cy="17" rx="3.4" ry="5.4" transform="rotate(288 8 17)"/></g>
+        <circle cx="22" cy="22" r="11" fill="url(#hb)"/><ellipse cx="18" cy="17" rx="3.4" ry="1.9" fill="#fff" opacity=".6" transform="rotate(-25 18 17)"/></svg>
+      <div><b>Bloom</b><span>Match 4 in a line. Clears the 3×3 block around it.</span></div>
+    </div>
+    <div class="ht">
+      <svg viewBox="0 0 44 44" aria-hidden="true"><defs><radialGradient id="hc" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#bfe3ff"/><stop offset=".45" stop-color="#57b0f2"/><stop offset="1" stop-color="#2a5f96"/></radialGradient></defs>
+        <path d="M2 22h40M22 2v40" stroke="rgba(211,229,245,.45)" stroke-width="2"/>
+        <circle cx="22" cy="22" r="11" fill="url(#hc)"/><circle cx="35" cy="12" r="2.6" fill="#fff"/><circle cx="9" cy="32" r="2.6" fill="#fff"/>
+        <ellipse cx="18" cy="17" rx="3.4" ry="1.9" fill="#fff" opacity=".6" transform="rotate(-25 18 17)"/></svg>
+      <div><b>Comet</b><span>Match an L or T shape. Clears its whole row and column.</span></div>
+    </div>
+    <div class="ht">
+      <svg viewBox="0 0 44 44" aria-hidden="true"><defs><radialGradient id="hp" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#cfd8e6"/><stop offset="1" stop-color="#8fa0b8"/></radialGradient>
+        <linearGradient id="hr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8fa8"/><stop offset=".35" stop-color="#ffd98f"/><stop offset=".65" stop-color="#8fd0a0"/><stop offset="1" stop-color="#8fb8ff"/></linearGradient></defs>
+        <circle cx="22" cy="22" r="16" fill="none" stroke="url(#hr)" stroke-width="3"/>
+        <circle cx="22" cy="22" r="10" fill="url(#hp)"/><ellipse cx="18" cy="17" rx="3.2" ry="1.8" fill="#fff" opacity=".7" transform="rotate(-25 18 17)"/></svg>
+      <div><b>Prism</b><span>Match 5 in a line. Swap it with any jewel to clear every jewel of that colour.</span></div>
+    </div>
+
+    <h4>Good to know</h4>
+    <ul>
+      <li>Specials also fire when they're caught in a match, and swapping two specials sets off both.</li>
+      <li>Every cascade step multiplies your score, meaning chains are where the big numbers live.</li>
+      <li>There is no timer, no move limit and no way to lose. If the board runs out of moves it stirs itself.</li>
+      <li>Hint and Stir are always free. Use them as much as you like.</li>
+      <li>Clearing jewels waters your Garden. Milestones light stars in the Sky, and each star grants a keepsake.</li>
+    </ul>
+    <p class="keys">Keyboard: arrow keys move, Space selects, H hints, M mutes.</p>
+    <button id="howClose" class="wide accent">Got it</button>
+  </div>
+</div>
 
 <div id="intro" class="open">
   <svg class="intro-gems" viewBox="0 0 200 120" aria-hidden="true">
@@ -151,6 +207,7 @@
   <h1>Gemlight</h1>
   <p>No timer. No losing.<br>Just jewels.</p>
   <button id="beginBtn">Begin</button>
+  <button id="howBtn2" class="ghost">How to play</button>
   <small>Clear jewels to grow a garden and light a sky. Everything saves on this device.</small>
 </div>
 

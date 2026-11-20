@@ -1,7 +1,7 @@
 /* Gemlight — a calm match-3. No timer, no fail state. */
 (() => {
 'use strict';
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const $ = s => document.querySelector(s);
 const missing = [];
 const on = (sel,ev,fn) => { const el=$(sel); if(el) el.addEventListener(ev,fn); else missing.push(sel); };
@@ -15,6 +15,7 @@ const hx = h => [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.
 const mix = (h1,h2,t) => { const a=hx(h1),b=hx(h2); return `rgb(${a.map((v,i)=>Math.round(lerp(v,b[i],t))).join(',')})`; };
 const rgba = (h,a) => { const c=hx(h); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
 const fmt = n => (n|0).toLocaleString();
+const nat = v => { v=Number(v); return Number.isFinite(v)&&v>0 ? Math.floor(v) : 0; };
 
 /* ---------- data ---------- */
 const SHAPES = ['circle','cushion','triangle','hexagon','teardrop','heart','pentagon'];
@@ -62,12 +63,13 @@ const LEGACY_PAL = { sorbet:300, sea:1200, ember:3000 };
 const LS = 'gemlight.v1';
 const DEF = { sound:true, music:false, volume:.8, motion:false, zen:false, size:8, colors:6, hint:8,
   palette:'dusty', particles:'spark', tray:'glass', scene:'aurora', chimes:'musicbox' };
-let S = {...DEF};
-let stats = { jewels:0, bestCascade:0, bestSession:0, sessions:0, perType:[0,0,0,0,0,0,0],
+const freshStats = () => ({ jewels:0, bestCascade:0, bestSession:0, sessions:0, perType:[0,0,0,0,0,0,0],
   seenIntro:false, notified:[], lit:[], prisms:0, blooms:0, comets:0, stirs:0, hints:0,
-  palettesUsed:['dusty'], gardenSeen:[0,0,0,0,0,0,0], skySeen:0 };
+  palettesUsed:['dusty'], gardenSeen:[0,0,0,0,0,0,0], skySeen:0 });
+let S = {...DEF};
+let stats = freshStats();
 let grid=[], score=0, shownScore=0, lastMilestone=0;
-let N=8, K=6, tab='play';
+let N=8, K=6, tab='play', canStore=false;
 
 /* ---------- reward catalogs ---------- */
 const LABELS = {
@@ -116,7 +118,7 @@ const MILESTONES = [
   {id:'s21',x:64,y:14, metric:'sessions',goal:40,   title:'Forty Evenings',     desc:'Start 40 boards.',                 reward:{type:'tray',id:'moss'}},
   {id:'s22',x:52,y:8,  metric:'type3',  goal:500,   title:'Still Water',        desc:'Clear 500 Sapphire.',              reward:{type:'decor',id:'cat'}},
   {id:'s23',x:40,y:14, metric:'comets', goal:40,    title:'Comet Weather',      desc:'Create 40 Comets.',                reward:{type:'tray',id:'lacquer'}},
-  {id:'s24',x:28,y:8,  metric:'type6',  goal:300,   title:'One Lily',           desc:'Clear 300 Aquamarine.',            reward:{type:'palette',id:'glacier'}},
+  {id:'s24',x:28,y:8,  metric:'type6',  goal:300,   title:'One Lily',           desc:'Clear 300 Aquamarine. Aquamarine only appears on the 7-jewel board.', reward:{type:'palette',id:'glacier'}},
   {id:'s25',x:16,y:16, metric:'jewels', goal:8000,  title:'Orchid Night',       desc:'Clear 8,000 jewels.',              reward:{type:'palette',id:'orchid'}},
   {id:'s26',x:10,y:28, metric:'hints',  goal:100,   title:'Patience',           desc:'Use 100 hints.',                   reward:{type:'decor',id:'chime'}},
   {id:'s27',x:12,y:52, metric:'stirs',  goal:40,    title:'Fresh Start, Again', desc:'Stir 40 times.',                   reward:{type:'particles',id:'stardust'}},
@@ -134,45 +136,118 @@ const MILESTONES = [
   {id:'s39',x:50,y:46, metric:'stars',  goal:30,    title:'Most of the Sky',    desc:'Light 30 stars.',                  reward:{type:'particles',id:'snowfall'}},
   {id:'s40',x:50,y:22, metric:'stars',  goal:39,    title:'The Whole Journey',  desc:'Light 39 stars.',                  reward:{type:'chimes',id:'dulcimer'}}
 ];
+const metricValue = m => m.metric==='jewels'?stats.jewels : m.metric==='cascade'?stats.bestCascade :
+  m.metric==='sessions'?stats.sessions : m.metric==='stirs'?stats.stirs : m.metric==='hints'?stats.hints :
+  m.metric==='prisms'?stats.prisms : m.metric==='blooms'?stats.blooms : m.metric==='comets'?stats.comets :
+  m.metric==='stars'?stats.lit.length : m.metric.startsWith('type')?stats.perType[+m.metric.slice(4)] : 0;
 
-/* ---------- persistence ---------- */
-function save(){
-  try{
-    localStorage.setItem(LS, JSON.stringify({ S, stats, score, lastMilestone,
-      grid: grid.map(row=>row.map(j=>j?{t:j.t,sp:j.sp}:null)) }));
-  }catch(e){}
+/* ---------- save codec (encoding + integrity check, not real security) ---------- */
+const SECRET = 'gemlight·dusty·2026·keep-it-kind';
+function h32(str,seed){
+  let h=seed>>>0;
+  for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619)>>>0; }
+  h^=h>>>15; h=Math.imul(h,2246822507)>>>0; h^=h>>>13; h=Math.imul(h,3266489909)>>>0; h^=h>>>16;
+  return h>>>0;
 }
-function load(){
+function sig(s){
+  const k=SECRET+'|'+s.length+'|';
+  return [h32(k+s,2166136261),h32(s+k,2246822519),h32(k+s+k,3266489917)]
+    .map(x=>x.toString(36).padStart(7,'0')).join('');
+}
+function keystream(n){
+  let s=h32(SECRET,0x9e3779b9)||1; const out=new Uint8Array(n);
+  for(let i=0;i<n;i++){ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; out[i]=s&255; }
+  return out;
+}
+function xorBytes(bytes){ const ks=keystream(bytes.length), out=new Uint8Array(bytes.length);
+  for(let i=0;i<bytes.length;i++) out[i]=bytes[i]^ks[i]; return out; }
+function b64enc(bytes){ let s=''; for(let i=0;i<bytes.length;i+=0x8000) s+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000)); return btoa(s); }
+function b64dec(str){ const bin=atob(str), out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out; }
+function encodePayload(o){ return b64enc(xorBytes(new TextEncoder().encode(JSON.stringify(o)))); }
+function decodePayload(b){ return JSON.parse(new TextDecoder().decode(xorBytes(b64dec(b)))); }
+function payload(){ return { S, stats, score, lastMilestone,
+  grid: grid.map(r=>r.map(j=>j?{t:j.t,sp:j.sp}:null)) }; }
+function envelope(){ const d=encodePayload(payload()); return JSON.stringify({v:2,d,h:sig(d)}); }
+
+function storageOK(){
+  try{ const k='gemlight.probe'; localStorage.setItem(k,'1');
+    const v=localStorage.getItem(k); localStorage.removeItem(k); return v==='1'; }catch(e){ return false; }
+}
+function save(){ if(!canStore) return;
+  try{ localStorage.setItem(LS, envelope()); }catch(e){ canStore=false; showStoreWarn(); syncStoreState(); } }
+
+function sanitizeSettings(raw){
+  const s={...DEF};
+  if(raw&&typeof raw==='object'){
+    for(const k of ['sound','music','motion','zen']) if(typeof raw[k]==='boolean') s[k]=raw[k];
+    if(Number.isFinite(+raw.volume)) s.volume=clamp(+raw.volume,0,1);
+    if(raw.size===7||raw.size===8) s.size=raw.size;
+    if(raw.colors===6||raw.colors===7) s.colors=raw.colors;
+    if([0,5,8,15].includes(+raw.hint)) s.hint=+raw.hint;
+    for(const k of ['palette','particles','tray','scene','chimes']) if(typeof raw[k]==='string') s[k]=raw[k];
+  }
+  return s;
+}
+function sanitizeStats(raw){
+  const s=freshStats();
+  if(!raw||typeof raw!=='object') return s;
+  for(const k of ['jewels','bestCascade','bestSession','sessions','prisms','blooms','comets','stirs','hints','skySeen']) s[k]=nat(raw[k]);
+  if(Array.isArray(raw.perType)) for(let i=0;i<7;i++) s.perType[i]=nat(raw.perType[i]);
+  if(Array.isArray(raw.gardenSeen)) for(let i=0;i<7;i++) s.gardenSeen[i]=clamp(nat(raw.gardenSeen[i]),0,4);
+  if(Array.isArray(raw.palettesUsed)) s.palettesUsed=raw.palettesUsed.filter(id=>PALETTES[id]);
+  if(!s.palettesUsed.includes('dusty')) s.palettesUsed.unshift('dusty');
+  s.seenIntro=!!raw.seenIntro;
+  s.bestCascade=clamp(s.bestCascade,0,99);
+  return s;
+}
+/* Stars are always re-derived from the counters, never trusted from the file. */
+function deriveLit(){
+  stats.lit=[];
+  for(let pass=0;pass<4;pass++){
+    let added=false;
+    for(const m of MILESTONES) if(!stats.lit.includes(m.id)&&metricValue(m)>=m.goal){ stats.lit.push(m.id); added=true; }
+    if(!added) break;
+  }
+}
+function readSave(raw){
+  if(!raw) return null;
   try{
-    const d = JSON.parse(localStorage.getItem(LS)||'null'); if(!d) return false;
-    S = {...DEF, ...d.S}; stats = {...stats, ...d.stats};
-    delete stats.postcards;
-    if(!Array.isArray(stats.perType)||stats.perType.length!==7) stats.perType=[0,0,0,0,0,0,0];
-    if(!Array.isArray(stats.notified)) stats.notified=[];
-    if(!Array.isArray(stats.lit)) stats.lit=[];
-    if(!Array.isArray(stats.palettesUsed)) stats.palettesUsed=['dusty'];
-    if(!Array.isArray(stats.gardenSeen)||stats.gardenSeen.length!==7) stats.gardenSeen=[0,0,0,0,0,0,0];
-    for(const k of ['particles','tray','scene','chimes']) if(!rewardUnlocked(k,S[k])) S[k]=BASE[k];
-    if(!PALETTES[S.palette] || !unlocked(S.palette)) S.palette='dusty';
-    if(S.size!==7&&S.size!==8) S.size=8;
-    if(S.colors!==6&&S.colors!==7) S.colors=6;
-    score = d.score|0; shownScore = score; lastMilestone = d.lastMilestone|0;
-    N=S.size; K=S.colors;
-    if(Array.isArray(d.grid) && d.grid.length===N && d.grid.every(r=>Array.isArray(r)&&r.length===N)){
-      grid = d.grid.map((row,r)=>row.map((c,cc)=>{
-        if(!c || typeof c.t!=='number' || c.t>=K || c.t<-1) return null;
-        return mk(c.t, r, cc, c.sp||null);
-      }));
-      if(grid.flat().some(j=>!j) || findMatches().length || !hasMove()){ grid=[]; return false; }
-      return true;
+    const env=JSON.parse(raw);
+    if(env&&env.v===2&&typeof env.d==='string'&&typeof env.h==='string'){
+      if(sig(env.d)!==env.h) return null;
+      const o=decodePayload(env.d);
+      return o&&typeof o==='object'?o:null;
     }
+    if(env&&env.stats) return env;           // legacy plain save → migrated on next write
   }catch(e){}
-  return false;
+  return null;
+}
+function applyPayload(o){
+  S=sanitizeSettings(o.S);
+  stats=sanitizeStats(o.stats);
+  deriveLit();
+  for(const k of ['particles','tray','scene','chimes']) if(!rewardUnlocked(k,S[k])) S[k]=BASE[k];
+  if(!PALETTES[S.palette]||!unlocked(S.palette)) S.palette='dusty';
+  score=nat(o.score); shownScore=score; lastMilestone=nat(o.lastMilestone);
+  N=S.size; K=S.colors; grid=[];
+  if(Array.isArray(o.grid)&&o.grid.length===N&&o.grid.every(r=>Array.isArray(r)&&r.length===N)){
+    grid=o.grid.map((row,r)=>row.map((c,cc)=>{
+      if(!c||typeof c.t!=='number'||c.t>=K||c.t<-1) return null;
+      let sp=(c.sp==='bloom'||c.sp==='comet'||c.sp==='prism')?c.sp:null;
+      let t=Math.floor(c.t);
+      if(sp==='prism') t=-1; else if(t<0) return null;
+      return mk(t,r,cc,sp);
+    }));
+    if(grid.flat().some(j=>!j)||findMatches().length||!hasMove()) grid=[];
+  }
+  return grid.length>0;
 }
 
 /* ---------- geometry & sprites ---------- */
 const wrap=$('#boardWrap'), cv=$('#board'), ctx=cv?cv.getContext('2d'):null;
-let W=0,H=0,dpr=1,cell=40,ox=0,oy=0, sprites=[], prismSpr=null;
+let W=0,H=0,dpr=1,cell=40,ox=0,oy=0, sprites=[], prismSpr=null, backdrop=null;
+let lastW=0,lastH=0,lastDpr=0,lastCell=0,lastN=0,lastK=0;
 const px = j => ox+(j.x+.5)*cell, py = j => oy+(j.y+.5)*cell;
 function rr(c,x,y,w,h,r){ r=Math.min(r,w/2,h/2); c.beginPath(); c.moveTo(x+r,y);
   c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
@@ -215,17 +290,46 @@ function bake(){
   sprites=[]; for(let i=0;i<7;i++) sprites.push(bakeJewel(pal().jewels[i],SHAPES[i]));
   prismSpr=bakeJewel('#c9d4e4','circle');
 }
+/* Halo + 64 sockets are static: bake once, blit every frame. */
+function buildBackdrop(){
+  if(!W||!H) return;
+  backdrop=document.createElement('canvas');
+  backdrop.width=Math.max(1,Math.round(W*dpr)); backdrop.height=Math.max(1,Math.round(H*dpr));
+  const c=backdrop.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0);
+  const p=pal();
+  const halo=c.createRadialGradient(W/2,H/2,cell,W/2,H/2,Math.max(W,H)*.72);
+  halo.addColorStop(0,rgba(p.accent,.07)); halo.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle=halo; c.fillRect(0,0,W,H);
+  for(let r=0;r<N;r++) for(let cc=0;cc<N;cc++){
+    rr(c,ox+cc*cell+2,oy+r*cell+2,cell-4,cell-4,cell*.22);
+    c.fillStyle=rgba(p.cell,.55); c.fill();
+    c.strokeStyle=rgba(p.accent,.07); c.lineWidth=1; c.stroke();
+  }
+}
+function remapFx(oldCell,oldOx,oldOy){
+  if(!oldCell) return;
+  const k=cell/oldCell;
+  for(const p of particles){ p.x=ox+(p.x-oldOx)*k; p.y=oy+(p.y-oldOy)*k; p.size*=k; p.vx*=k; p.vy*=k; }
+  for(const e of effects) if(e.kind==='ring'){ e.x=ox+(e.x-oldOx)*k; e.y=oy+(e.y-oldOy)*k; }
+  for(const f of floats){ f.x=ox+(f.x-oldOx)*k; f.y=oy+(f.y-oldOy)*k; }
+}
 function resize(){
   if(!wrap||!ctx||!wrap.offsetParent) return;
-  const r=wrap.getBoundingClientRect(); if(r.width<10||r.height<10) return;
-  W=r.width; H=r.height;
-  dpr=Math.min(2,window.devicePixelRatio||1);
-  cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const r=wrap.getBoundingClientRect();
+  if(r.width<10||r.height<10) return;
+  const w=Math.round(r.width), h=Math.round(r.height), d=Math.min(2,window.devicePixelRatio||1);
   N=S.size; K=S.colors;
-  cell=Math.max(24,Math.floor(Math.min(W,H)/N));
+  const cl=Math.max(24,Math.floor(Math.min(w,h)/N));
+  if(w===lastW&&h===lastH&&d===lastDpr&&cl===lastCell&&N===lastN&&K===lastK&&sprites.length) return;
+  const oldCell=lastCell, oldOx=ox, oldOy=oy;
+  W=w; H=h; dpr=d; cell=cl;
   ox=(W-cell*N)/2; oy=(H-cell*N)/2;
-  bake(); particles.length=0; effects.length=0; floats.length=0;
+  const bw=Math.round(W*dpr), bh=Math.round(H*dpr);
+  if(cv.width!==bw||cv.height!==bh){ cv.width=bw; cv.height=bh; }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(cl!==lastCell||d!==lastDpr||!sprites.length) bake();
+  buildBackdrop(); remapFx(oldCell,oldOx,oldOy);
+  lastW=w; lastH=h; lastDpr=d; lastCell=cl; lastN=N; lastK=K;
 }
 
 /* ---------- jewels & tweens ---------- */
@@ -325,10 +429,8 @@ function afterSwap(){
 function specialSwap(a,b){
   const set=new Set([a,b]), handled=new Set();
   const prisms=[a,b].filter(j=>j.sp==='prism');
-  if(prisms.length===2){
-    allJewels().forEach(j=>set.add(j));
-    prisms.forEach(p=>handled.add(p));
-  } else if(prisms.length===1){
+  if(prisms.length===2){ allJewels().forEach(j=>set.add(j)); prisms.forEach(p=>handled.add(p)); }
+  else if(prisms.length===1){
     const p=prisms[0], other=p===a?b:a;
     if(other.t>=0) allJewels().forEach(j=>{ if(j.t===other.t) set.add(j); });
     handled.add(p);
@@ -451,7 +553,7 @@ function afterStir(){
   const m=findMatches();
   if(m.length) beginResolve(m,1,null); else finishTurn();
 }
-function newBoard(){
+function newBoard(countSession=true){
   T.length=0; particles.length=0; effects.length=0; floats.length=0;
   sel=null; hintPair=null; depth=0; score=0; shownScore=0; lastMilestone=0;
   const cb=$('#cascade'); if(cb) cb.hidden=true;
@@ -470,7 +572,8 @@ function newBoard(){
   allJewels().forEach(j=>{ j.y=j.r-N-rnd(0,1.5);
     const d=.3+j.r*.035+j.c*.012; maxDur=Math.max(maxDur,d);
     tween(j,{x:j.c,y:j.r},d,easeO,0,()=>{j.land=1;}); });
-  stats.sessions++; setPhase('fall',maxDur+.05); checkMilestones(false); save(); updateHUD();
+  if(countSession) stats.sessions++;
+  setPhase('fall',maxDur+.05); checkMilestones(false); save(); updateHUD();
 }
 
 /* ---------- particles / effects / floats ---------- */
@@ -563,7 +666,8 @@ function stopMusic(){
 }
 
 /* ---------- input ---------- */
-let dragStart=null, dragCell=null, swiped=false, kcur=null;
+let dragStart=null, dragCell=null, swiped=false, kcur=null, lastInput=0;
+const touched=()=>{ lastInput=performance.now(); };
 function cellAt(e){
   const r=cv.getBoundingClientRect();
   const c=Math.floor((e.clientX-r.left-ox)/cell), rr_=Math.floor((e.clientY-r.top-oy)/cell);
@@ -571,7 +675,7 @@ function cellAt(e){
 }
 if(cv){
   cv.addEventListener('pointerdown',e=>{
-    ensureAudio(); idleT=0; hintPair=null;
+    ensureAudio(); touched(); idleT=0; hintPair=null;
     if(phase!=='idle') return;
     const p=cellAt(e); if(!p) return;
     dragStart={x:e.clientX,y:e.clientY}; dragCell=p; swiped=false; kcur=null;
@@ -583,13 +687,14 @@ if(cv){
     if(Math.max(Math.abs(dx),Math.abs(dy))<14) return;
     const [dr,dc]=Math.abs(dx)>Math.abs(dy)?[0,Math.sign(dx)]:[Math.sign(dy),0];
     const b=at(dragCell.r+dr,dragCell.c+dc);
-    swiped=true; sel=null;
+    swiped=true; sel=null; touched();
     if(b) trySwap(grid[dragCell.r][dragCell.c],b);
   });
   cv.addEventListener('pointerup',()=>{
     if(dragStart&&!swiped&&phase==='idle'&&dragCell){
       const j=grid[dragCell.r][dragCell.c];
       if(j){
+        touched();
         if(sel===j) sel=null;
         else if(sel&&Math.abs(sel.r-j.r)+Math.abs(sel.c-j.c)===1){ const a=sel; sel=null; trySwap(a,j); }
         else { sel=j; sndSelect(); }
@@ -602,7 +707,8 @@ if(cv){
 }
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('keydown',e=>{
-  const sheet=$('#sheet'), conf=$('#confirm'), intro=$('#intro');
+  const how=$('#howto'), sheet=$('#sheet'), conf=$('#confirm'), intro=$('#intro');
+  if(how&&how.classList.contains('open')){ if(e.key==='Escape'||e.key==='Enter') closeHow(); return; }
   if(sheet&&sheet.classList.contains('open')){ if(e.key==='Escape') closeSheet(); return; }
   if(conf&&conf.classList.contains('open')){ if(e.key==='Escape') closeConfirm(); return; }
   if(intro&&intro.classList.contains('open')){ if(e.key==='Enter'||e.key===' ') begin(); return; }
@@ -612,7 +718,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='h'){ showHint(); return; }
   if(phase!=='idle') return;
   const dirs={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]};
-  if(dirs[e.key]){ e.preventDefault(); ensureAudio();
+  if(dirs[e.key]){ e.preventDefault(); ensureAudio(); touched();
     if(!kcur) kcur={r:(N/2)|0,c:(N/2)|0};
     else{ const [dr,dc]=dirs[e.key];
       if(sel&&sel.r===kcur.r&&sel.c===kcur.c){
@@ -621,7 +727,7 @@ document.addEventListener('keydown',e=>{
       kcur={r:clamp(kcur.r+dr,0,N-1),c:clamp(kcur.c+dc,0,N-1)};
     }
   }
-  if((e.key===' '||e.key==='Enter')&&kcur){ e.preventDefault();
+  if((e.key===' '||e.key==='Enter')&&kcur){ e.preventDefault(); touched();
     const j=grid[kcur.r][kcur.c]; if(!j) return;
     if(sel===j) sel=null;
     else if(sel&&Math.abs(sel.r-j.r)+Math.abs(sel.c-j.c)===1){const a=sel;sel=null;trySwap(a,j);}
@@ -693,15 +799,8 @@ function drawParticle(p){
 function draw(time){
   if(!ctx||!W||!H) return;
   ctx.clearRect(0,0,W,H);
+  if(backdrop) ctx.drawImage(backdrop,0,0,W,H);
   const p=pal();
-  const halo=ctx.createRadialGradient(W/2,H/2,cell,W/2,H/2,Math.max(W,H)*.72);
-  halo.addColorStop(0,rgba(p.accent,.07)); halo.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=halo; ctx.fillRect(0,0,W,H);
-  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
-    rr(ctx,ox+c*cell+2,oy+r*cell+2,cell-4,cell-4,cell*.22);
-    ctx.fillStyle=rgba(p.cell,.55); ctx.fill();
-    ctx.strokeStyle=rgba(p.accent,.07); ctx.lineWidth=1; ctx.stroke();
-  }
   if(hintPair&&phase==='idle'){
     const a=.3+.4*(Math.sin(time*4)+1)/2;
     for(const j of hintPair){
@@ -747,12 +846,25 @@ function draw(time){
   ctx.globalAlpha=1;
 }
 
-/* ---------- loop ---------- */
-let last=performance.now(), raf=0;
+/* ---------- loop: 60fps while busy, 30fps idle, 10fps off-screen, stopped when hidden ---------- */
+let last=performance.now(), acc=0, raf=0;
+const sheetOpen = () => { const el=$('#sheet'); return !!el&&el.classList.contains('open'); };
+const howOpen = () => { const el=$('#howto'); return !!el&&el.classList.contains('open'); };
+function busy(){
+  return phase!=='idle'||T.length>0||particles.length>0||effects.length>0||floats.length>0
+    ||sel!==null||Math.abs(shownScore-score)>.5||(performance.now()-lastInput<1500);
+}
 function frame(now){
-  const dt=Math.min(.05,(now-last)/1000); last=now;
-  stepTweens(dt);
-  if(phase!=='idle'){ phaseT-=dt;
+  raf=requestAnimationFrame(frame);
+  let dt=(now-last)/1000; last=now;
+  if(!(dt>0)) dt=0;
+  acc+=Math.min(.05,dt);
+  const active=busy(), onScreen=(tab==='play'&&!sheetOpen()&&!howOpen());
+  const minStep = active ? 0 : (onScreen ? 1/30 : 1/10);
+  if(acc<minStep) return;
+  const step=acc; acc=0;
+  stepTweens(step);
+  if(phase!=='idle'){ phaseT-=step;
     if(phaseT<=0){
       if(phase==='swap') afterSwap();
       else if(phase==='swapback') setPhase('idle',0);
@@ -761,27 +873,24 @@ function frame(now){
       else if(phase==='stir') afterStir();
     }
   } else if(tab==='play'){
-    idleT+=dt;
+    idleT+=step;
     if(S.hint>0&&!hintPair&&!sel&&idleT>S.hint) hintPair=findHint();
   }
-  for(const j of allJewels()){
-    if(j.land>0) j.land=Math.max(0,j.land-dt*5);
-    j.glintT-=dt; if(j.glintT<=0){j.glint=1;j.glintT=rnd(5,13);}
-    if(j.glint>0) j.glint=Math.max(0,j.glint-dt*1.6);
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const j=grid[r][c]; if(!j) continue;
+    if(j.land>0) j.land=Math.max(0,j.land-step*5);
+    j.glintT-=step; if(j.glintT<=0){ j.glint=1; j.glintT=rnd(5,13); }
+    if(j.glint>0) j.glint=Math.max(0,j.glint-step*1.6);
   }
-  stepFx(dt);
-  if(Math.abs(shownScore-score)>.5){ shownScore=lerp(shownScore,score,Math.min(1,dt*9)); updateHUD(); }
+  stepFx(step);
+  if(Math.abs(shownScore-score)>.5){ shownScore=lerp(shownScore,score,Math.min(1,step*9)); updateHUD(); }
   else if(shownScore!==score){ shownScore=score; updateHUD(); }
-  if(tab==='play') draw(now/1000);
-  raf=requestAnimationFrame(frame);
+  if(onScreen) draw(now/1000);
 }
+function startLoop(){ if(!raf&&!document.hidden){ last=performance.now(); acc=0; raf=requestAnimationFrame(frame); } }
 function updateHUD(){ const el=$('#score'); if(el) el.textContent=Math.round(shownScore).toLocaleString(); }
 
 /* ---------- milestone engine ---------- */
-const metricValue = m => m.metric==='jewels'?stats.jewels : m.metric==='cascade'?stats.bestCascade :
-  m.metric==='sessions'?stats.sessions : m.metric==='stirs'?stats.stirs : m.metric==='hints'?stats.hints :
-  m.metric==='prisms'?stats.prisms : m.metric==='blooms'?stats.blooms : m.metric==='comets'?stats.comets :
-  m.metric==='stars'?stats.lit.length : m.metric.startsWith('type')?stats.perType[+m.metric.slice(4)] : 0;
 function checkMilestones(quiet){
   let changed=false;
   for(const m of MILESTONES){
@@ -978,7 +1087,7 @@ function setTab(t){
   for(const b of tabs.children) b.classList.toggle('on',b.dataset.tab===t);
   const scr={play:$('#scr-play'),garden:$('#scr-garden'),sky:$('#scr-sky')};
   for(const k in scr) if(scr[k]) scr[k].classList.toggle('on',k===t);
-  if(t==='play') resize();
+  if(t==='play'){ resize(); startLoop(); }
   if(t==='garden'){ renderGarden(); markGardenSeen(); }
   if(t==='sky'){ renderSky(); markSkySeen(); }
   save();
@@ -988,6 +1097,52 @@ function updateTabBadges(){
   const g=tabs.children[1].querySelector('.badge'), s=tabs.children[2].querySelector('.badge');
   if(g) g.hidden=!stats.perType.some((v,i)=>stageOf(i)>stats.gardenSeen[i]);
   if(s) s.hidden=!(stats.lit.length>stats.skySeen);
+}
+
+/* ---------- storage UI ---------- */
+function isFramed(){ try{ return window.top!==window.self; }catch(e){ return true; } }
+function showStoreWarn(){
+  const el=$('#storeWarn'); if(!el) return;
+  const framed=isFramed(), msg=$('#storeMsg'), btn=$('#storeOpen');
+  if(msg) msg.textContent = framed
+    ? "Saving is blocked in this embedded view. Open in a new tab to keep your garden."
+    : "Saving is blocked (private browsing or site settings). Export from Settings to keep a copy.";
+  if(btn) btn.hidden=!framed;
+  el.hidden=false;
+}
+function syncStoreState(){
+  const el=$('#storeState'); if(!el) return;
+  el.textContent = canStore ? 'On this device ✓' : 'Not available ✕';
+  el.style.color = canStore ? 'var(--good)' : 'var(--warn)';
+}
+function exportSave(){
+  try{
+    const blob=new Blob([envelope()],{type:'application/json'});
+    const url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download='gemlight-save-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    toast('Save file exported ⤓');
+  }catch(e){ toast('Could not export the save.'); }
+}
+function importSaveText(text){
+  const o=readSave(text);
+  if(!o){ toast("That file isn't a valid Gemlight save."); return; }
+  openConfirm('Replace your current progress with this file? Your existing garden and stars will be overwritten.',()=>{
+    const ok=applyPayload(o);
+    if(!ok) newBoard(false);
+    stats.seenIntro=true;
+    if(canStore){ save(); location.reload(); }
+    else { refreshAll(); toast('Save loaded for this session ✦'); }
+  });
+}
+function refreshAll(){
+  N=S.size; K=S.colors;
+  setPalette(S.palette); syncSettingsUI(); fillCosmeticSelects(); applyCosmetics();
+  lastCell=0; resize(); updateHUD(); checkMilestones(true); updateTabBadges(); syncStoreState();
+  if(tab==='garden') renderGarden();
+  if(tab==='sky') renderSky();
+  startLoop();
 }
 
 /* ---------- UI ---------- */
@@ -1000,7 +1155,7 @@ function toast(msg){
 }
 function showHint(){
   if(phase!=='idle'||tab!=='play') return;
-  ensureAudio(); hintPair=findHint(); idleT=0; stats.hints++; sndSelect(); checkMilestones(false); save();
+  ensureAudio(); touched(); hintPair=findHint(); idleT=0; stats.hints++; sndSelect(); checkMilestones(false); save();
 }
 function toggleSound(){
   S.sound=!S.sound; ensureAudio();
@@ -1029,7 +1184,7 @@ function setPalette(id){
   root.setProperty('--scrim',p.light?'rgba(90,70,50,.35)':'rgba(7,11,18,.55)');
   document.body.dataset.palette=id;
   const meta=document.querySelector('meta[name=theme-color]'); if(meta) meta.content=p.bg[0];
-  bake(); renderPalettes();
+  bake(); buildBackdrop(); renderPalettes();
   if(tab==='garden') renderGarden();
   if(tab==='sky') renderSky();
   checkMilestones(false); save();
@@ -1065,14 +1220,14 @@ function renderStats(){
     : 'The whole sky is lit ✨';
 }
 function openSheet(){
-  renderPalettes(); renderStats(); fillCosmeticSelects();
+  renderPalettes(); renderStats(); fillCosmeticSelects(); syncStoreState();
   const sh=$('#sheet'), sc=$('#scrim');
   if(sh) sh.classList.add('open'); if(sc) sc.classList.add('open');
 }
 function closeSheet(){
   const sh=$('#sheet'), sc=$('#scrim');
   if(sh) sh.classList.remove('open'); if(sc) sc.classList.remove('open');
-  save();
+  save(); startLoop();
 }
 let confirmCb=null;
 function openConfirm(text,cb){
@@ -1080,6 +1235,8 @@ function openConfirm(text,cb){
   if(t) t.textContent=text; confirmCb=cb; if(c) c.classList.add('open');
 }
 function closeConfirm(){ const c=$('#confirm'); if(c) c.classList.remove('open'); confirmCb=null; }
+function openHow(){ const h=$('#howto'); if(h){ h.classList.add('open'); const b=$('#howClose'); if(b) b.focus(); } }
+function closeHow(){ const h=$('#howto'); if(h) h.classList.remove('open'); startLoop(); }
 function freshBoard(){
   if(score>0) openConfirm('Start a fresh board? Your garden, stars and keepsakes stay.',()=>{newBoard();toast('A fresh board ✧');});
   else { newBoard(); toast('A fresh board ✧'); }
@@ -1107,9 +1264,23 @@ on('#settingsBtn','click',()=>{ensureAudio();openSheet();});
 on('#closeSheet','click',closeSheet);
 on('#scrim','click',closeSheet);
 on('#hintBtn','click',showHint);
-on('#stirBtn','click',()=>{ensureAudio();doStir(false);});
-on('#newBtn','click',()=>{ensureAudio();freshBoard();});
+on('#stirBtn','click',()=>{ensureAudio();touched();doStir(false);});
+on('#newBtn','click',()=>{ensureAudio();touched();freshBoard();});
 on('#freshBtn','click',()=>{closeSheet();freshBoard();});
+on('#howBtn','click',()=>{ensureAudio();openHow();});
+on('#howBtn2','click',()=>{ensureAudio();openHow();});
+on('#howClose','click',closeHow);
+on('#howto','click',e=>{ if(e.target&&e.target.id==='howto') closeHow(); });
+on('#storeOpen','click',()=>{ try{ window.open(location.href,'_blank','noopener'); }catch(e){} });
+on('#exportBtn','click',exportSave);
+on('#importBtn','click',()=>{ const f=$('#importFile'); if(f){ f.value=''; f.click(); } });
+on('#importFile','change',e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>importSaveText(String(rd.result||''));
+  rd.onerror=()=>toast('Could not read that file.');
+  rd.readAsText(f);
+});
 on('#resetBtn','click',()=>{
   closeSheet();
   openConfirm('Erase all progress, stats and keepsakes? This cannot be undone.',()=>{
@@ -1138,59 +1309,55 @@ on('#setParticles','change',e=>equip('particles',e.target.value));
 on('#setChimes','change',e=>equip('chimes',e.target.value));
 on('#segSize','click',e=>{
   const v=e.target.dataset&&+e.target.dataset.v; if(!v||v===S.size)return;
-  S.size=v; resize(); newBoard(); syncSettingsUI(); toast(`A cozy ${v}×${v} board ✧`);
+  S.size=v; resize(); newBoard(false); syncSettingsUI(); toast(`A cozy ${v}×${v} board ✧`);
 });
 on('#segColors','click',e=>{
   const v=e.target.dataset&&+e.target.dataset.v; if(!v||v===S.colors)return;
-  S.colors=v; resize(); newBoard(); syncSettingsUI(); toast(v===6?'Six jewels — gentler matches':'Seven jewels — the classic mix');
+  S.colors=v; resize(); newBoard(false); syncSettingsUI(); toast(v===6?'Six jewels — gentler matches':'Seven jewels — the classic mix');
 });
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){ cancelAnimationFrame(raf); save(); if(AC)AC.suspend(); }
-  else{ last=performance.now(); raf=requestAnimationFrame(frame); if(AC&&S.sound)AC.resume(); }
+  if(document.hidden){ cancelAnimationFrame(raf); raf=0; save(); if(AC)AC.suspend(); }
+  else{ startLoop(); if(AC&&S.sound)AC.resume(); }
 });
 window.addEventListener('pagehide',save);
-if(wrap && window.ResizeObserver) new ResizeObserver(()=>resize()).observe(wrap);
-
-/* ---------- home-screen icon ---------- */
-function makeIcon(){
-  try{
-    const s=document.createElement('canvas'); s.width=s.height=180;
-    const c=s.getContext('2d');
-    const g=c.createLinearGradient(0,0,180,180);
-    g.addColorStop(0,'#1f3349'); g.addColorStop(1,'#0e1622');
-    rr(c,0,0,180,180,40); c.fillStyle=g; c.fill();
-    const jg=c.createRadialGradient(72,64,8,90,94,62);
-    jg.addColorStop(0,'#ffd7ea'); jg.addColorStop(.45,'#f28bb8'); jg.addColorStop(1,'#a04a78');
-    c.shadowColor='rgba(242,139,184,.7)'; c.shadowBlur=26;
-    shapePath(c,'heart',90,92,52); c.fillStyle=jg; c.fill(); c.shadowBlur=0;
-    c.beginPath(); c.ellipse(72,66,15,8,-.5,0,7); c.fillStyle='rgba(255,255,255,.6)'; c.fill();
-    c.fillStyle='#d3e5f5';
-    c.beginPath(); c.moveTo(142,32); c.lineTo(146,42); c.lineTo(156,46); c.lineTo(146,50); c.lineTo(142,60); c.lineTo(138,50); c.lineTo(128,46); c.lineTo(138,42); c.closePath(); c.fill();
-    const link=$('#ati'); if(link) link.href=s.toDataURL('image/png');
-  }catch(e){}
-}
+let roPending=false;
+const queueResize=()=>{ if(roPending) return; roPending=true;
+  requestAnimationFrame(()=>{ roPending=false; resize(); }); };
+if(wrap&&window.ResizeObserver) new ResizeObserver(queueResize).observe(wrap);
+window.addEventListener('orientationchange',()=>setTimeout(queueResize,250));
 
 /* ---------- boot ---------- */
-try{ if(!localStorage.getItem(LS) && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) S.motion=true; }catch(e){}
-const restored=load();
+canStore=storageOK();
+try{ if(canStore && !localStorage.getItem(LS) && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) S.motion=true; }catch(e){}
+let restored=false;
+if(canStore){ const o=readSave(localStorage.getItem(LS)); if(o) restored=applyPayload(o); }
 N=S.size; K=S.colors;
 setPalette(S.palette);
 syncSettingsUI();
 fillCosmeticSelects();
 applyCosmetics();
 resize();
-if(!restored) newBoard(); else { updateHUD(); setTimeout(()=>toast('Welcome back — your board was waiting ✦'),700); }
+if(!restored) newBoard(); else { updateHUD(); save(); setTimeout(()=>toast('Welcome back — your board was waiting ✦'),700); }
 checkMilestones(true);
 updateTabBadges();
+syncStoreState();
+if(!canStore) showStoreWarn();
 if(stats.seenIntro){ const i=$('#intro'); if(i) i.classList.remove('open'); }
 const ver=$('#ver'); if(ver) ver.textContent='Gemlight v'+APP_VERSION;
-if(missing.length) console.warn('Gemlight: markup missing for '+missing.join(', ')+' — deploy the v1.2 index.html and styles.css alongside this file.');
-raf=requestAnimationFrame(frame);
+if(missing.length) console.warn('Gemlight: markup missing for '+missing.join(', ')+'.');
+startLoop();
 if('serviceWorker' in navigator && location.protocol!=='file:'){
   const hadController=!!navigator.serviceWorker.controller;
+  let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(hadController) toast('New version installed ✦ it opens next time');
+    if(!hadController||refreshing) return;
+    refreshing=true; save(); toast('Updating Gemlight ✦');
+    setTimeout(()=>location.reload(),600);
   });
-  navigator.serviceWorker.register('sw.js?v='+APP_VERSION).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v='+APP_VERSION,{updateViaCache:'none'})
+    .then(reg=>{
+      reg.update().catch(()=>{});
+      document.addEventListener('visibilitychange',()=>{ if(!document.hidden) reg.update().catch(()=>{}); });
+    }).catch(()=>{});
 }
 })();

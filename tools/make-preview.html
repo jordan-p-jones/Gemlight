@@ -7,12 +7,14 @@
   body{margin:0;padding:28px;background:#0e1622;color:#e9f1f9;
     font-family:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif}
   h1{font-size:22px;margin:0 0 4px}
-  p{color:#93a7bd;font-size:14px;margin:0 0 22px;max-width:640px;line-height:1.5}
+  h2{font-size:15px;margin:30px 0 8px;color:#8fb8dd;letter-spacing:.06em;text-transform:uppercase}
+  p{color:#93a7bd;font-size:14px;margin:0 0 16px;max-width:680px;line-height:1.5}
   .wrap{position:relative;max-width:760px;border-radius:16px;overflow:hidden;border:1px solid rgba(143,184,221,.22)}
   .wrap canvas{display:block;width:100%;height:auto}
   .safe{position:absolute;top:0;bottom:0;left:23.75%;width:52.5%;border:2px dashed rgba(233,180,91,.75);pointer-events:none}
   .safe span{position:absolute;top:6px;left:8px;font-size:11px;color:#e9b45b;letter-spacing:.08em}
-  .row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap;margin-top:24px}
+  .cover{max-width:420px}
+  .row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap;margin-top:16px}
   .box{text-align:center}
   .box canvas{display:block;border-radius:14px;border:1px solid rgba(143,184,221,.22)}
   .box small{display:block;color:#93a7bd;margin-top:8px;font-size:12px}
@@ -22,12 +24,20 @@
 </style>
 </head>
 <body>
-<h1>✦ Gemlight preview generator</h1>
-<p>The dashed box is the square Messages crops to. Everything important sits inside it, so the thumbnail reads “Gemlight” instead of “eml”. Download both files and drop them in your repo root.</p>
+<h1>✦ Gemlight image generator</h1>
+<p>Three exports: the link-preview card, the itch.io cover, and the home-screen icon. Everything is drawn in code — no assets to source.</p>
 
+<h2>Link preview · 1200×630</h2>
+<p>The dashed box is the square Messages crops to. Everything important sits inside it, so the thumbnail reads “Gemlight” instead of “eml”.</p>
 <div class="wrap"><canvas id="og"></canvas><div class="safe"><span>SQUARE CROP SAFE ZONE</span></div></div>
-<button id="dlOg">Download og.png (1200×630)</button>
+<button id="dlOg">Download og.png</button>
 
+<h2>itch.io cover · 630×500</h2>
+<p>Upload this one manually in the itch.io project editor under <em>Cover image</em>. It is not referenced by the app, so no HTML change is needed.</p>
+<div class="wrap cover"><canvas id="cover"></canvas></div>
+<button id="dlCover">Download itch-cover.png</button>
+
+<h2>Icon &amp; crop check</h2>
 <div class="row">
   <div class="box"><canvas id="sq" width="300" height="300"></canvas><small>What Messages shows</small></div>
   <div class="box"><canvas id="ic" width="180" height="180"></canvas><small>apple-touch-icon.png</small>
@@ -35,13 +45,10 @@
 </div>
 
 <script>
-const W=1200,H=630;
-const og=document.getElementById('og'); og.width=W; og.height=H;
-const c=og.getContext('2d');
+const FONT='ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif';
 const hx=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
 const mix=(a,b,t)=>{const x=hx(a),y=hx(b);return `rgb(${x.map((v,i)=>Math.round(v+(y[i]-v)*t)).join(',')})`;};
 const rgba=(h,a)=>{const k=hx(h);return `rgba(${k[0]},${k[1]},${k[2]},${a})`;};
-const FONT='ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif';
 
 function rr(g,x,y,w,h,r){r=Math.min(r,w/2,h/2);g.beginPath();g.moveTo(x+r,y);
   g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
@@ -81,65 +88,91 @@ function sparkle(g,x,y,s,col,alpha){
   g.quadraticCurveTo(x-s*.18,y-s*.18,x,y-s);
   g.closePath(); g.fill(); g.restore();
 }
-function glow(g,cx,cy,r,col,a){
-  const gr=g.createRadialGradient(cx,cy,0,cx,cy,r);
-  gr.addColorStop(0,rgba(col,a)); gr.addColorStop(1,rgba(col,0));
-  g.fillStyle=gr; g.fillRect(0,0,W,H);
+function backdrop(g,W,H){
+  const bg=g.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#0e1622'); bg.addColorStop(.52,'#172536'); bg.addColorStop(1,'#1f3349');
+  g.fillStyle=bg; g.fillRect(0,0,W,H);
+  g.globalCompositeOperation='lighter';
+  const glow=(cx,cy,r,col,a)=>{ const gr=g.createRadialGradient(cx,cy,0,cx,cy,r);
+    gr.addColorStop(0,rgba(col,a)); gr.addColorStop(1,rgba(col,0)); g.fillStyle=gr; g.fillRect(0,0,W,H); };
+  glow(W*.15,H*.14,W*.44,'#8fb8dd',.20);
+  glow(W*.88,H*.89,W*.40,'#b58cf0',.13);
+  glow(W*.5,H*1.02,W*.44,'#5fd2c8',.08);
+  g.globalCompositeOperation='source-over';
 }
 
-function render(){
-  const bg=c.createLinearGradient(0,0,W,H);
-  bg.addColorStop(0,'#0e1622'); bg.addColorStop(.52,'#172536'); bg.addColorStop(1,'#1f3349');
-  c.fillStyle=bg; c.fillRect(0,0,W,H);
-  c.globalCompositeOperation='lighter';
-  glow(c,180,90,520,'#8fb8dd',.20);
-  glow(c,1050,560,480,'#b58cf0',.13);
-  glow(c,600,640,520,'#5fd2c8',.08);
-  c.globalCompositeOperation='source-over';
-
+/* ---- 1200×630 link preview ---- */
+const W=1200,H=630;
+const og=document.getElementById('og'); og.width=W; og.height=H;
+(function(){
+  const c=og.getContext('2d');
+  backdrop(c,W,H);
   jewel(c,'circle',110,175,72,'#e2637e',.16);
   jewel(c,'hexagon',1092,468,84,'#57b0f2',.15);
   jewel(c,'heart',158,528,58,'#f28bb8',.12);
   sparkle(c,1030,120,20,'#d3e5f5',.35);
   sparkle(c,250,420,13,'#8fb8dd',.30);
   sparkle(c,940,300,10,'#d3e5f5',.22);
-
   jewel(c,'circle',474,268,56,'#e2637e',1);
   jewel(c,'hexagon',726,268,56,'#57b0f2',1);
   jewel(c,'heart',600,242,82,'#f28bb8',1);
   sparkle(c,700,152,17,'#d3e5f5',.9);
   sparkle(c,506,166,11,'#d3e5f5',.6);
-
   c.textAlign='center'; c.textBaseline='middle';
-  c.fillStyle='#e9f1f9';
-  c.font='800 104px '+FONT;
+  c.fillStyle='#e9f1f9'; c.font='800 104px '+FONT;
   c.shadowColor='rgba(143,184,221,.45)'; c.shadowBlur=32;
-  c.fillText('Gemlight',600,418);
-  c.shadowBlur=0;
+  c.fillText('Gemlight',600,418); c.shadowBlur=0;
   c.font='500 34px '+FONT; c.fillStyle='#93a7bd';
-
+  c.fillText('No timer. No losing. Just jewels.',600,490);
   document.getElementById('sq').getContext('2d').drawImage(og,(W-H)/2,0,H,H,0,0,300,300);
-}
+})();
 
-function renderIcon(){
-  const ic=document.getElementById('ic'), g=ic.getContext('2d');
+/* ---- 630×500 itch.io cover ---- */
+const cover=document.getElementById('cover'); cover.width=630; cover.height=500;
+(function(){
+  const c=cover.getContext('2d');
+  backdrop(c,630,500);
+  jewel(c,'circle',52,86,40,'#e2637e',.14);
+  jewel(c,'hexagon',584,432,46,'#57b0f2',.14);
+  sparkle(c,556,74,13,'#d3e5f5',.32);
+  sparkle(c,74,392,10,'#8fb8dd',.28);
+  jewel(c,'circle',222,196,42,'#e2637e',1);
+  jewel(c,'hexagon',408,196,42,'#57b0f2',1);
+  jewel(c,'heart',315,172,62,'#f28bb8',1);
+  sparkle(c,392,104,13,'#d3e5f5',.9);
+  sparkle(c,246,116,9,'#d3e5f5',.6);
+  c.textAlign='center'; c.textBaseline='middle';
+  c.fillStyle='#e9f1f9'; c.font='800 76px '+FONT;
+  c.shadowColor='rgba(143,184,221,.45)'; c.shadowBlur=26;
+  c.fillText('Gemlight',315,318); c.shadowBlur=0;
+  c.font='500 24px '+FONT; c.fillStyle='#93a7bd';
+  c.fillText('No timer. No losing. Just jewels.',315,372);
+  c.font='600 17px '+FONT; c.fillStyle='#8fb8dd';
+  c.fillText('A CALM MATCH-3 · GROW A GARDEN, LIGHT A SKY',315,414);
+})();
+
+/* ---- 180×180 touch icon ---- */
+const ic=document.getElementById('ic');
+(function(){
+  const g=ic.getContext('2d');
   const bg=g.createLinearGradient(0,0,180,180);
   bg.addColorStop(0,'#1f3349'); bg.addColorStop(1,'#0e1622');
   rr(g,0,0,180,180,40); g.fillStyle=bg; g.fill();
   jewel(g,'heart',90,96,50,'#f28bb8',1);
   sparkle(g,140,44,15,'#d3e5f5',.95);
   sparkle(g,40,140,9,'#8fb8dd',.7);
-}
+})();
+
 function dl(canvas,name){
   canvas.toBlob(b=>{
     const u=URL.createObjectURL(b), a=document.createElement('a');
-    a.href=u; a.download=name; a.click();
-    setTimeout(()=>URL.revokeObjectURL(u),2000);
+    a.href=u; a.download=name; document.body.append(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(u),3000);
   },'image/png');
 }
-render(); renderIcon();
 document.getElementById('dlOg').onclick=()=>dl(og,'og.png');
-document.getElementById('dlIc').onclick=()=>dl(document.getElementById('ic'),'apple-touch-icon.png');
+document.getElementById('dlCover').onclick=()=>dl(cover,'itch-cover.png');
+document.getElementById('dlIc').onclick=()=>dl(ic,'apple-touch-icon.png');
 </script>
 </body>
 </html>

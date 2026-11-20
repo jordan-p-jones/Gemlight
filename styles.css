@@ -237,3 +237,39 @@ body.rm .intro-gems{animation:none}
 }
 .ver{margin:2px 0 0;text-align:center;font-size:11px;letter-spacing:.08em;color:var(--muted);opacity:.55;font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
+
+/* ---- v1.4 ---- */
+#actions{flex:none}
+#scoreWrap{flex:1;min-width:0}
+#cascade[hidden]{display:inline-block!important;visibility:hidden}
+body.zen #cascade[hidden]{display:none!important}
+
+#storeWarn{display:flex;align-items:center;gap:10px;margin:6px 18px 0;padding:10px 14px;border-radius:14px;
+  background:rgba(233,180,91,.12);border:1px solid rgba(233,180,91,.4);font-size:12.5px;line-height:1.4}
+#storeWarn[hidden]{display:none!important}
+#storeWarn span{flex:1}
+#storeOpen{flex:none;padding:8px 12px;border-radius:999px;background:var(--warn);color:#231a08;font-weight:700;font-size:12px;white-space:nowrap}
+#storeOpen:active{transform:scale(.95)}
+
+.ghost{margin-top:10px;padding:10px 22px;border-radius:999px;border:1px solid var(--line);color:var(--accent2);font-size:14px;font-weight:700;background:var(--panelA)}
+.ghost:active{transform:scale(.95)}
+
+#howto{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:18px;background:var(--scrim);
+  backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);opacity:0;visibility:hidden;transition:opacity .25s,visibility 0s .25s}
+#howto.open{opacity:1;visibility:visible;transition:opacity .25s}
+#howto .card{width:min(420px,100%);max-height:86dvh;overflow-y:auto;overscroll-behavior:contain;background:var(--panel);
+  border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+#howto .card::-webkit-scrollbar{width:8px}
+#howto .card::-webkit-scrollbar-track{background:transparent}
+#howto .card::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+#howto h2{margin:0 0 6px;font-size:21px}
+#howto .lead{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
+#howto h4{margin:18px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--muted)}
+.ht{display:flex;gap:12px;align-items:flex-start;padding:7px 0}
+.ht svg{flex:none;width:42px;height:42px}
+.ht b{display:block;font-size:15px}
+.ht span{display:block;color:var(--muted);font-size:12.5px;line-height:1.45}
+#howto ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.6}
+#howto .keys{margin:12px 0 0;font-size:11.5px;color:var(--muted);opacity:.8}
+#howto .wide{margin-top:16px}
+.row .meta{font-size:12.5px;color:var(--muted)}

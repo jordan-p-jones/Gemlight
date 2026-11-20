@@ -3,7 +3,7 @@
    so bumping APP_VERSION in one place purges old caches and precaches fresh files. */
 const VERSION = new URL(self.location.href).searchParams.get('v') || 'dev';
 const CACHE = 'gemlight-' + VERSION;
-const ASSETS = ['./', 'index.html', 'styles.css', 'game.js', 'manifest.webmanifest', 'icon.svg'];
+const ASSETS = ['./', 'index.html', 'styles.css', 'game.js', 'manifest.webmanifest', 'icon.svg', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(

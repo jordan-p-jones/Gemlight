@@ -1,7 +1,7 @@
 /* Gemlight — a calm match-3. No timer, no fail state. */
 (() => {
 'use strict';
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 const $ = s => document.querySelector(s);
 const missing = [];
 const on = (sel,ev,fn) => { const el=$(sel); if(el) el.addEventListener(ev,fn); else missing.push(sel); };
@@ -1183,7 +1183,6 @@ if(!restored) newBoard(); else { updateHUD(); setTimeout(()=>toast('Welcome back
 checkMilestones(true);
 updateTabBadges();
 if(stats.seenIntro){ const i=$('#intro'); if(i) i.classList.remove('open'); }
-makeIcon();
 const ver=$('#ver'); if(ver) ver.textContent='Gemlight v'+APP_VERSION;
 if(missing.length) console.warn('Gemlight: markup missing for '+missing.join(', ')+' — deploy the v1.2 index.html and styles.css alongside this file.');
 raf=requestAnimationFrame(frame);

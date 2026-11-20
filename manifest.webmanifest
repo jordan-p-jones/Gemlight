@@ -1,0 +1,14 @@
+{
+  "name": "Gemlight — a calm match-3",
+  "short_name": "Gemlight",
+  "description": "No timer. No losing. Just jewels.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e1622",
+  "theme_color": "#0e1622",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Gemlight — a calm match-3</title>
+<meta name="description" content="No timer. No losing. Just jewels.">
+<meta name="theme-color" content="#0e1622">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gemlight">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" id="ati" href="icon.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-palette="dusty">
+
+<div class="sky" aria-hidden="true">
+  <div class="aurora a1"></div><div class="aurora a2"></div><div class="aurora a3"></div>
+  <div class="motes"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+  <div class="grain"></div>
+</div>
+
+<main id="app">
+  <header id="top">
+    <div id="brand"><span class="mark">✦</span> Gemlight</div>
+    <div class="top-actions">
+      <button id="soundBtn" class="icon-btn" aria-pressed="true" aria-label="Mute sound">
+        <svg id="icoOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6.5 9H3v6h3.5L11 19V5z" fill="currentColor" stroke="none"/><path d="M15 9.5a4 4 0 0 1 0 5"/><path d="M17.5 7a8 8 0 0 1 0 10"/></svg>
+        <svg id="icoOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M11 5 6.5 9H3v6h3.5L11 19V5z" fill="currentColor" stroke="none"/><path d="m15 9 6 6M21 9l-6 6"/></svg>
+      </button>
+      <button id="settingsBtn" class="icon-btn" aria-label="Open settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.01a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section id="boardWrap"><canvas id="board" aria-label="Jewel board"></canvas></section>
+
+  <footer id="hud">
+    <div id="scoreWrap"><span class="lbl">Score</span><span id="score">0</span><span id="cascade" hidden>×2</span></div>
+    <div id="actions">
+      <button id="hintBtn" class="pill hint">✦ <span>Hint</span></button>
+      <button id="stirBtn" class="pill">↻ <span>Stir</span></button>
+      <button id="newBtn" class="pill">✧ <span>New</span></button>
+    </div>
+  </footer>
+</main>
+
+<div id="toasts" aria-live="polite"></div>
+<div id="scrim"></div>
+
+<aside id="sheet" role="dialog" aria-label="Settings">
+  <div class="grab"></div>
+  <div class="sheet-head"><h2>Settings</h2><button id="closeSheet" class="icon-btn" aria-label="Close settings">✕</button></div>
+
+  <h3>Sound</h3>
+  <div class="row"><span>Sound effects</span><label class="switch"><input type="checkbox" id="setSound" checked><span></span></label></div>
+  <div class="row"><span>Ambient music</span><label class="switch"><input type="checkbox" id="setMusic"><span></span></label></div>
+  <div class="row"><span>Volume</span><input type="range" id="setVolume" min="0" max="1" step="0.05" value="0.8"></div>
+
+  <h3>Comfort</h3>
+  <div class="row"><span>Reduce motion</span><label class="switch"><input type="checkbox" id="setMotion"><span></span></label></div>
+  <div class="row"><span>Pure Zen <small>hide the score</small></span><label class="switch"><input type="checkbox" id="setZen"><span></span></label></div>
+  <div class="row"><span>Idle hints</span>
+    <select id="setHint"><option value="0">Off</option><option value="5">After 5s</option><option value="8" selected>After 8s</option><option value="15">After 15s</option></select>
+  </div>
+
+  <h3>Board</h3>
+  <div class="row"><span>Size</span><div class="seg" id="segSize"><button data-v="7">Cozy 7×7</button><button data-v="8" class="on">Classic 8×8</button></div></div>
+  <div class="row"><span>Jewels</span><div class="seg" id="segColors"><button data-v="6" class="on">6 · gentle</button><button data-v="7">7 · classic</button></div></div>
+
+  <h3>Palette</h3>
+  <div id="palettes"></div>
+
+  <h3>Keepsakes</h3>
+  <div id="stats"></div>
+  <div id="unlockProg"></div>
+
+  <h3>&nbsp;</h3>
+  <div class="row btns"><button id="freshBtn" class="wide">✧ Start a fresh board</button></div>
+  <div class="row btns"><button id="resetBtn" class="wide danger">Erase everything</button></div>
+  <p class="foot">Made for slow evenings. Progress saves itself on this device.</p>
+</aside>
+
+<div id="confirm"><div class="card"><p id="confirmText"></p><div class="btns"><button id="confirmNo" class="wide">Keep playing</button><button id="confirmYes" class="wide accent">Yes</button></div></div></div>
+
+<div id="intro" class="open">
+  <svg class="intro-gems" viewBox="0 0 200 120" aria-hidden="true">
+    <defs>
+      <radialGradient id="g1" cx="35%" cy="30%" r="80%"><stop offset="0%" stop-color="#ffb3c2"/><stop offset="45%" stop-color="#e2637e"/><stop offset="100%" stop-color="#8e2f47"/></radialGradient>
+      <radialGradient id="g2" cx="35%" cy="30%" r="80%"><stop offset="0%" stop-color="#ffd7ea"/><stop offset="45%" stop-color="#f28bb8"/><stop offset="100%" stop-color="#a04a78"/></radialGradient>
+      <radialGradient id="g3" cx="35%" cy="30%" r="80%"><stop offset="0%" stop-color="#bfe3ff"/><stop offset="45%" stop-color="#57b0f2"/><stop offset="100%" stop-color="#2a5f96"/></radialGradient>
+    </defs>
+    <circle cx="52" cy="66" r="30" fill="url(#g1)"/>
+    <path d="M100 96 C 66 70 74 30 100 48 C 126 30 134 70 100 96 Z" fill="url(#g2)"/>
+    <path d="M152 38 L177 52 L177 80 L152 94 L127 80 L127 52 Z" fill="url(#g3)"/>
+    <ellipse cx="42" cy="54" rx="9" ry="5" fill="#fff" opacity=".55" transform="rotate(-25 42 54)"/>
+    <ellipse cx="90" cy="52" rx="7" ry="4" fill="#fff" opacity=".5" transform="rotate(-20 90 52)"/>
+    <ellipse cx="143" cy="52" rx="8" ry="4" fill="#fff" opacity=".5" transform="rotate(-25 143 52)"/>
+    <path d="M168 22 l2.2 5.6 5.6 2.2 -5.6 2.2 -2.2 5.6 -2.2 -5.6 -5.6 -2.2 5.6 -2.2 z" fill="#d3e5f5"/>
+    <path d="M28 24 l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6 z" fill="#d3e5f5" opacity=".8"/>
+  </svg>
+  <h1>Gemlight</h1>
+  <p>No timer. No losing.<br>Just jewels.</p>
+  <button id="beginBtn">Begin</button>
+  <small>Progress saves automatically on this device.</small>
+</div>
+
+<script src="game.js" defer></script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 /* Gemlight — a calm match-3. No timer, no fail state. */
 (() => {
-'use strict';
+  'use strict';
+const APP_VERSION = '1.0.1';
 const $ = s => document.querySelector(s);
 const clamp = (v,a,b) => v<a?a:v>b?b:v;
 const lerp = (a,b,t) => a+(b-a)*t;
@@ -547,6 +548,10 @@ function drawJewel(j,time){
 function draw(time){
   ctx.clearRect(0,0,W,H);
   const p=pal();
+  const halo=ctx.createRadialGradient(W/2,H/2,cell,W/2,H/2,Math.max(W,H)*.72);
+  halo.addColorStop(0,rgba(p.accent,.07)); halo.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
+
   for(let r=0;r<N;r++) for(let c=0;c<N;c++){
     rr(ctx,ox+c*cell+2,oy+r*cell+2,cell-4,cell-4,cell*.22);
     ctx.fillStyle=rgba(p.cell,.55); ctx.fill();
@@ -649,7 +654,8 @@ function toggleSound(){
   syncSoundBtn(); save();
 }
 function syncSoundBtn(){
-  $('#icoOn').hidden=!S.sound; $('#icoOff').hidden=S.sound;
+  $('#icoOn').style.display=S.sound?'':'none';
+  $('#icoOff').style.display=S.sound?'none':'';
   $('#soundBtn').setAttribute('aria-pressed',String(S.sound));
   $('#soundBtn').setAttribute('aria-label',S.sound?'Mute sound':'Unmute sound');
 }
@@ -788,7 +794,13 @@ resize();
 if(!restored) newBoard(); else { updateHUD(); setTimeout(()=>toast('Welcome back — your board was waiting ✦'),700); }
 if(stats.seenIntro) $('#intro').classList.remove('open');
 makeIcon();
+$('#ver').textContent='Gemlight v'+APP_VERSION;
 raf=requestAnimationFrame(frame);
-if('serviceWorker' in navigator && location.protocol!=='file:')
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator && location.protocol!=='file:'){
+  const hadController=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(hadController) toast('New version installed ✦ it opens next time');
+  });
+  navigator.serviceWorker.register('sw.js?v='+APP_VERSION).catch(()=>{});
+}
 })();

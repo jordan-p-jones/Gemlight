@@ -144,4 +144,6 @@ body.rm .intro-gems{animation:none}
   #hud{padding:4px 16px calc(6px + env(safe-area-inset-bottom))}#score{font-size:20px}
   .pill{padding:8px 12px;font-size:13px}#boardWrap{margin:4px 12px}
 }
-</style>
+
+.ver{margin:2px 0 0;text-align:center;font-size:11px;letter-spacing:.08em;color:var(--muted);opacity:.55;font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}

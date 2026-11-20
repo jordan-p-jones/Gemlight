@@ -8,7 +8,7 @@
 <meta property="og:type" content="website">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Gemlight — a calm match-3</title>
-<meta name="description" content="No timer. No losing. Just jewels.">
+<meta name="description" content="No timer. No losing. Just jewels. A calm match-3 with a garden that grows and a sky that fills.">
 <meta name="theme-color" content="#0e1622">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -19,10 +19,12 @@
 <link rel="apple-touch-icon" id="ati" href="icon.svg">
 <link rel="stylesheet" href="styles.css">
 </head>
-<body data-palette="dusty">
+<body data-palette="dusty" data-tray="glass" data-scene="aurora">
 
 <div class="sky" aria-hidden="true">
   <div class="aurora a1"></div><div class="aurora a2"></div><div class="aurora a3"></div>
+  <div class="sun"></div>
+  <div id="sceneFx"></div>
   <div class="motes"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
   <div class="grain"></div>
 </div>
@@ -41,16 +43,37 @@
     </div>
   </header>
 
-  <section id="boardWrap"><canvas id="board" aria-label="Jewel board"></canvas></section>
+  <nav id="tabs" aria-label="Screens">
+    <button data-tab="play" class="on">✦ Play</button>
+    <button data-tab="garden">❀ Garden<span class="badge" hidden></span></button>
+    <button data-tab="sky">✧ Sky<span class="badge" hidden></span></button>
+  </nav>
 
-  <footer id="hud">
-    <div id="scoreWrap"><span class="lbl">Score</span><span id="score">0</span><span id="cascade" hidden>×2</span></div>
-    <div id="actions">
-      <button id="hintBtn" class="pill hint">✦ <span>Hint</span></button>
-      <button id="stirBtn" class="pill">↻ <span>Stir</span></button>
-      <button id="newBtn" class="pill">✧ <span>New</span></button>
-    </div>
-  </footer>
+  <div id="screens">
+    <section id="scr-play" class="screen on">
+      <div id="boardWrap"><canvas id="board" aria-label="Jewel board"></canvas></div>
+      <footer id="hud">
+        <div id="scoreWrap"><span class="lbl">Score</span><span id="score">0</span><span id="cascade" hidden>×2</span></div>
+        <div id="actions">
+          <button id="hintBtn" class="pill hint">✦ <span>Hint</span></button>
+          <button id="stirBtn" class="pill">↻ <span>Stir</span></button>
+          <button id="newBtn" class="pill">✧ <span>New</span></button>
+        </div>
+      </footer>
+    </section>
+
+    <section id="scr-garden" class="screen">
+      <div class="scr-head"><h2>The Windowsill</h2><p id="gardenSub">Every jewel you clear waters its plant.</p></div>
+      <div id="gardenShelf"></div>
+      <div id="gardenDetail" class="detail"></div>
+    </section>
+
+    <section id="scr-sky" class="screen">
+      <div class="scr-head"><h2>The Journey</h2><p id="skySub"></p></div>
+      <div id="skyMap"></div>
+      <div id="skyDetail" class="detail"></div>
+    </section>
+  </div>
 </main>
 
 <div id="toasts" aria-live="polite"></div>
@@ -79,6 +102,12 @@
   <h3>Palette</h3>
   <div id="palettes"></div>
 
+  <h3>Atmosphere</h3>
+  <div class="row"><span>Sky scene</span><select id="setScene"></select></div>
+  <div class="row"><span>Board tray</span><select id="setTray"></select></div>
+  <div class="row"><span>Clear sparkles</span><select id="setParticles"></select></div>
+  <div class="row"><span>Chime voice</span><select id="setChimes"></select></div>
+
   <h3>Keepsakes</h3>
   <div id="stats"></div>
   <div id="unlockProg"></div>
@@ -86,7 +115,7 @@
   <h3>&nbsp;</h3>
   <div class="row btns"><button id="freshBtn" class="wide">✧ Start a fresh board</button></div>
   <div class="row btns"><button id="resetBtn" class="wide danger">Erase everything</button></div>
-  <p class="foot">Made for slow evenings. Progress saves itself on this device.</p>
+  <p class="foot">No timer, no fail state, no account. Progress saves itself on this device.</p>
   <p class="ver" id="ver"></p>
 </aside>
 
@@ -111,7 +140,7 @@
   <h1>Gemlight</h1>
   <p>No timer. No losing.<br>Just jewels.</p>
   <button id="beginBtn">Begin</button>
-  <small>Progress saves automatically on this device.</small>
+  <small>Clear jewels to grow a garden and light a sky. Everything saves on this device.</small>
 </div>
 
 <script src="game.js" defer></script>

@@ -1,7 +1,7 @@
 /* Gemlight — a calm match-3. No timer, no fail state. */
 (() => {
 'use strict';
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const $ = s => document.querySelector(s);
 const missing = [];
 const on = (sel,ev,fn) => { const el=$(sel); if(el) el.addEventListener(ev,fn); else missing.push(sel); };
@@ -317,10 +317,14 @@ function resize(){
   if(!wrap||!ctx||!wrap.offsetParent) return;
   const r=wrap.getBoundingClientRect();
   if(r.width<10||r.height<10) return;
-  const w=Math.round(r.width), h=Math.round(r.height), d=Math.min(2,window.devicePixelRatio||1);
+  const d=Math.min(2,window.devicePixelRatio||1);
+  const vw=document.documentElement.clientWidth||Math.round(r.width);
+  const w=Math.max(200,Math.min(Math.round(r.width), vw-28));
+  const h=Math.round(r.height);
   N=S.size; K=S.colors;
   const cl=Math.max(24,Math.floor(Math.min(w,h)/N));
   if(w===lastW&&h===lastH&&d===lastDpr&&cl===lastCell&&N===lastN&&K===lastK&&sprites.length) return;
+  if(Math.round(r.width)>vw-26) console.warn('Gemlight: wrap over-reported width', Math.round(r.width), 'vs', vw);
   const oldCell=lastCell, oldOx=ox, oldOy=oy;
   W=w; H=h; dpr=d; cell=cl;
   ox=(W-cell*N)/2; oy=(H-cell*N)/2;
@@ -1324,7 +1328,13 @@ let roPending=false;
 const queueResize=()=>{ if(roPending) return; roPending=true;
   requestAnimationFrame(()=>{ roPending=false; resize(); }); };
 if(wrap&&window.ResizeObserver) new ResizeObserver(queueResize).observe(wrap);
-window.addEventListener('orientationchange',()=>setTimeout(queueResize,250));
+  window.addEventListener('orientationchange', () => setTimeout(queueResize, 250));
+
+window.addEventListener('pageshow',queueResize);
+if(window.visualViewport){
+  visualViewport.addEventListener('resize',queueResize);
+  visualViewport.addEventListener('scroll',()=>{ if(visualViewport.scale>1.01) queueResize(); });
+}
 
 /* ---------- boot ---------- */
 canStore=storageOK();
@@ -1337,6 +1347,7 @@ syncSettingsUI();
 fillCosmeticSelects();
 applyCosmetics();
 resize();
+requestAnimationFrame(()=>requestAnimationFrame(()=>resize()));
 if(!restored) newBoard(); else { updateHUD(); save(); setTimeout(()=>toast('Welcome back — your board was waiting ✦'),700); }
 checkMilestones(true);
 updateTabBadges();
